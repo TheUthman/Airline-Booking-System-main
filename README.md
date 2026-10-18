@@ -1,5 +1,7 @@
 # Airline Booking System Backend
 
+This repository contains a
+
 Spring Boot microservices implementation of the supplied architecture guide. The gateway is the only backend URL a frontend should call.
 
 The root `pom.xml` is a Maven aggregator, so you can compile all services from the project root with `mvn compile` or package them with `mvn package`.
