@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: flight-service
+  config:
+    import: "optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
+  datasource:
+    url: ${FLIGHT_DB_URL:jdbc:h2:file:./data/flight-db;MODE=PostgreSQL;AUTO_SERVER=TRUE}
+    username: ${FLIGHT_DB_USERNAME:sa}
+    password: ${FLIGHT_DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+server:
+  port: 8083
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+jwt:
+  secret: ${JWT_SECRET:}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# Illustrative defaults for the cost-based fare estimate. Calibrate with reliable operational data.
+pricing:
+  estimate:
+    fuel-price-per-litre: ${FUEL_PRICE_PER_LITRE:950}
+    route-distance-factor: ${ROUTE_DISTANCE_FACTOR:1.12}
+    taxi-and-overhead-hours: ${TAXI_AND_OVERHEAD_HOURS:0.50}
+    crew-cost-per-flight: ${CREW_COST_PER_FLIGHT:120000}
+    load-factor: ${EXPECTED_LOAD_FACTOR:0.75}
+    target-profit-margin: ${TARGET_PROFIT_MARGIN:0.10}
+    other-revenue-per-flight: ${OTHER_REVENUE_PER_FLIGHT:0}
+    business-fare-multiplier: ${BUSINESS_FARE_MULTIPLIER:3.0}

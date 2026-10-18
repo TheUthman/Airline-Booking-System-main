@@ -1,0 +1,122 @@
+package com.airline.passengerservice;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDate;
+import java.util.*;
+
+@RestController
+@RequestMapping("/api/passengers")
+public class PassengerController {
+    private final PassengerRepository repository;
+
+    PassengerController(PassengerRepository repository) {
+        this.repository = repository;
+    }
+
+    @GetMapping("/me")
+    List<Passenger> mine(@RequestHeader("X-User-Email") String email) {
+        return repository.findByOwnerEmail(email);
+    }
+
+    @GetMapping
+    List<Passenger> list(
+            @RequestHeader("X-User-Email") String email,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if ("ADMIN".equalsIgnoreCase(role)) {
+            return repository.findAll();
+        }
+        return mine(email);
+    }
+
+    @PostMapping("/staff/manifest")
+    List<StaffManifestPassengerView> staffManifestPassengers(
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @Valid @RequestBody @NotEmpty List<@NotNull @Positive Long> ids) {
+        if (!"STAFF".equalsIgnoreCase(role) && !"ADMIN".equalsIgnoreCase(role)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff access is required");
+        }
+        return repository.findAllById(ids).stream()
+                .map(passenger -> new StaffManifestPassengerView(
+                        passenger.getId(), passenger.getFirstName(), passenger.getLastName()))
+                .toList();
+    }
+
+    @GetMapping("/saved-travelers")
+    List<Passenger> savedTravelers(@RequestHeader("X-User-Email") String email) {
+        return repository.findByOwnerEmail(email).stream().filter(Passenger::isSavedTraveler).toList();
+    }
+
+    @GetMapping("/{id}")
+    Passenger one(@PathVariable Long id, @RequestHeader("X-User-Email") String email) {
+        return owned(id, email);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void delete(@PathVariable Long id, @RequestHeader("X-User-Email") String email) {
+        repository.delete(owned(id, email));
+    }
+
+    @PostMapping("/{id}/points")
+    Passenger adjustPoints(@PathVariable Long id, @RequestHeader("X-User-Email") String email,
+            @RequestParam @Min(1) int points) {
+        Passenger p = owned(id, email);
+        p.setFrequentFlyerPoints(p.getFrequentFlyerPoints() + points);
+        return repository.save(p);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    Passenger create(
+            @RequestHeader("X-User-Email") String email,
+            @Valid @RequestBody PassengerRequest request) {
+        Passenger p = new Passenger();
+        copy(p, request);
+        p.setOwnerEmail(email);
+        return repository.save(p);
+    }
+
+    @PutMapping("/{id}")
+    Passenger update(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Email") String email,
+            @Valid @RequestBody PassengerRequest request) {
+        Passenger p = owned(id, email);
+        copy(p, request);
+        return repository.save(p);
+    }
+
+    private void copy(Passenger p, PassengerRequest r) {
+        p.setFirstName(r.firstName());
+        p.setLastName(r.lastName());
+        p.setDateOfBirth(r.dateOfBirth());
+        p.setPhone(r.phone());
+        p.setDocumentNumber(r.documentNumber());
+        p.setPassportNationality(r.passportNationality());
+        p.setPassportExpiryDate(r.passportExpiryDate());
+        p.setSavedTraveler(r.savedTraveler());
+    }
+
+    private Passenger owned(Long id, String email) {
+        return repository.findByIdAndOwnerEmail(id, email).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Passenger not found"));
+    }
+
+    record PassengerRequest(
+            @NotBlank String firstName,
+            @NotBlank String lastName,
+            @NotNull @Past LocalDate dateOfBirth,
+            String phone,
+            String documentNumber,
+            String passportNationality,
+            LocalDate passportExpiryDate,
+            boolean savedTraveler) {}
+
+    public record StaffManifestPassengerView(Long id, String firstName, String lastName) {}
+}
